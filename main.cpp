@@ -1,181 +1,187 @@
 //
-// Created by Chaos Sherill on 10/20/22.
+// Created by Chaos Sherill on 10/24/22.
 //
 #include <iostream>
-#include <cstdlib>
 #include <fstream>
-#define     FIRST   -9
-struct s_obj {
-    char       type;
-    float       x;
-    float       y;
+#include <cstdlib>
+#define     X 0
+#define     Y 1
+struct s_obj{
+    int     type;
+    float   xCentre;
+    float   yCentre;
 };
 
-struct s_vec {
-    char       type;
-    float       x;
-    float       y;
+struct s_vec{
+    float   xLine;
+    float   yLine;
 };
 
-s_vec    compare = {-1};
-s_obj    firstObj = {-1};
+s_obj   objectA = {-1};
+s_vec   vectorAB = {0,0};
 
-bool    isValidZeroVec(s_vec vecTemp)
-{
-    if((compare.x == 0 && vecTemp.x != 0) || (compare.y == 0 && vecTemp.y != 0))
-        return false;
-    else if(compare.y == 0)
-    {
-        // vecTemp || compare => compare == (k * vecTemp.x) : (k * vecTemp.y)  >> where k = compare.x / vecTemp.x
-        float ll = (((compare.x) / (vecTemp.x)) * vecTemp.x);
-        if(compare.x != ll)
-            return false;
-    }
-    else if (compare.x == 0)
-    {
-        // vecTemp || compare => compare == (k * vecTemp.x) : (k * vecTemp.y)  >> where k = compare.y / vecTemp.y
-        if(compare.y != ((compare.y / (vecTemp.y)) * vecTemp.y))
-            return false;
-    }
-    return true;
-}
-
-bool    isValidVec(s_vec vecTemp){
-    if (vecTemp.x * compare.y == vecTemp.y * compare.x)
-       return (true);
-    return (false);
-}
-
-int algCol(int **crd, int type)
-{
-    s_vec           vecTemp = {};
-    if (type == 1) {
-        float y = (float) (crd[1][1] - crd[0][1]) / 2;
-        vecTemp = {2, (float) ((float) crd[0][0] + ((float) (crd[3][0] - crd[0][0]) / 2) - firstObj.x),
-                   (float) ((float) crd[0][1] + ((float) (crd[1][1] - crd[0][1]) / 2) - firstObj.y)};
+int findPositionMinCord(float **crd){
+    int temp = 0;
+    for(int i = 1; i < 2; ++i)
+        if(crd[temp][0] > crd[i][0])
+            temp = i;
+    if(crd[temp][0] == crd[(temp+1)%4][0]) {
+        if (crd[temp][1] > crd[(temp + 1) % 4][1])
+            temp = (temp + 1) % 4;
     }
     else
-        vecTemp = {2, (float)crd[0][0] - firstObj.x, (float)crd[0][1] - firstObj.y};
-    if(vecTemp.x == 0 && vecTemp.y == 0)
-        return true;
-    else if(compare.x == 0 || compare.y == 0)
-        return (isValidZeroVec(vecTemp));
-    else
-        return (isValidVec(vecTemp));
+    {
+        if (temp == 0 && crd[temp][1] > crd[temp + 3][1])
+            temp += 3;
+        else if(temp != 0 && crd[temp][1] > crd[(temp-1)][1])
+            temp = temp - 1;
+    }
+    return temp;
 }
 
-int findCompareVector(std::ifstream *inFile, int **crd, int *count)
-{
-    int type;
-    for(;(*count) != 0;(--*count)){
-        if(!((*inFile) >> type))
-            return 2;
-        if (type == 1){
-            (*inFile) >> (crd)[0][0];
-            (*inFile) >> (crd)[0][1];
-            (*inFile) >> (crd)[1][0];
-            (*inFile) >> (crd)[1][1];
-            (*inFile) >> (crd)[2][0];
-            (*inFile) >> (crd)[2][1];
-            (*inFile) >> (crd)[3][0];
-            (*inFile) >> (crd)[3][1];
-            if (firstObj.type == -1) {
-                firstObj = {1, (float) crd[0][0] + (float)((float)(crd[3][0] - crd[0][0]) / 2),
-                            (float) crd[0][1] + ((float)(crd[1][1] - crd[0][1])/2) };
-            }
-            else if(compare.type == -1){
-                float x = ((float)crd[3][0] - (float)crd[0][0])/2;
-                float y = ((float)(crd[1][1] - crd[0][1])/2);;
-                compare = {-1, (float)crd[0][0] + ((float)(crd[3][0] - crd[0][0])/2) - firstObj.x,
-                           (float)crd[0][1] + y - firstObj.y};
-                if(compare.y == 0 && compare.x == 0)
-                    compare = {-1};
-                else
-                    break;
-            }
+void    initObjectA(int *countObj, float  **crd, std::ifstream *inFile){
+    int         type;
+    int         posMin;
+
+    (*countObj) -= 1;
+    (*inFile) >> type;
+    if(type == 1) {
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 2; ++j)
+                (*inFile) >> crd[i][j];
+        posMin = findPositionMinCord(crd);
+        objectA = {type, crd[posMin][0] + (crd[(posMin + 2)%4][0] - crd[posMin][0]),
+                            crd[posMin][1] + (crd[(posMin + 2)%4][0] - crd[posMin][0])};
+    }
+    else
+    {
+        (*inFile) >> crd[1][0];
+        (*inFile) >> crd[0][0];
+        (*inFile) >> crd[0][1];
+        objectA = {type, crd[0][0], crd[0][1]};
+    }
+}
+
+void    initCompareVector(int *countObj, float  **crd, std::ifstream *inFile, bool *status){
+    int     type;
+    s_obj   objectB;
+    int     posMin;
+
+    for(;*countObj > 0;--*countObj)
+    {
+        if(!((*inFile) >> type)) {
+            (*status) = true;
+            break;
         }
-        else if (type == 0){
-            (*inFile) >> (crd)[1][0];
-            (*inFile) >> (crd)[0][0];
-            (*inFile) >> (crd)[0][1];
-            if (firstObj.type == -1)
-                firstObj = {(char) 0, (float) crd[0][0], (float) crd[0][1]};
-            else if(compare.type == -1){
-                compare = {1, (float)crd[0][0] - firstObj.x, (float)crd[0][1] - firstObj.y};
-                if(compare.y == 0 && compare.x == 0)
-                    compare = {-1};
-            } else
-                break;
-        if (compare.type != -1)
+        if(type == 1){
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 2; ++j)
+                    (*inFile) >> crd[i][j];
+            posMin = findPositionMinCord(crd);
+            objectB = {type, crd[posMin][0] + (crd[(posMin + 2)%4][0] - crd[posMin][0]),
+                       crd[posMin][1] + (crd[(posMin + 2)%4][0] - crd[posMin][0])};
+        }
+        else {
+            (*inFile) >> crd[1][0];
+            (*inFile) >> crd[0][0];
+            (*inFile) >> crd[0][1];
+            objectB = {type, crd[0][0], crd[0][1]};
+        }
+        if(objectB.xCentre == objectA.xCentre && objectB.yCentre == objectA.yCentre)
+            continue;
+        else {
+            //The construction of the vector is based on the bases, the path from A -> B
+            //AB => (Bx-Ax;By-Ay)
+            vectorAB = {objectB.xCentre - objectA.xCentre,objectB.yCentre - objectA.yCentre};
             break;
         }
     }
-    return true;
 }
 
-
-int main()
+bool isColZeroVector(s_vec vectorAC)
 {
-    std::ifstream           inFile("input.txt");
-    std::ofstream           outFile("output.txt");
-//    std::ifstream           inFile("../input.txt");
-//    std::ofstream           outFile("../output.txt");
-    int                     countObj;
-    int                     type;
-    int                     **crd;
-    int                     status;
+    //AB(0,Y) != AC(X,0)
+    if(vectorAB.xLine == 0 != vectorAC.xLine || vectorAB.yLine == 0 != vectorAC.yLine)
+        return false;
+    //AB (0,Y) => ABy == (ABy / ACy) * ACy => AB||AC
+    else if (vectorAB.xLine == 0 &&
+                    vectorAB.yLine != (vectorAB.yLine/vectorAC.yLine) * vectorAC.yLine)
+        return false;
+    //AB (X,0) => ABx == (ABx / ACx) * ACx => AB||AC
+    else if (vectorAB.yLine == 0 &&
+                    vectorAB.xLine != (vectorAB.xLine/vectorAC.xLine) * vectorAC.xLine)
+        return false;
+    else
+        return true;
+}
+
+bool isColVector(s_vec vectorAC)
+{
+    if(vectorAC.xLine * vectorAB.yLine == vectorAC.yLine * vectorAB.xLine)
+        return true;
+    return false;
+}
+
+//The construction of the vector is based on the bases, the path from A -> C
+//AC => (Cx-Ax;Cy-Ay)
+//This fnc check collinearity AB||AC
+bool algCollinearity(s_obj objectC){
+    s_vec  vectorAC = {objectC.xCentre - objectA.xCentre, objectC.yCentre - objectA.yCentre};
+
+    if (vectorAC.xLine == 0 && vectorAC.yLine == 0)
+        return true;
+    else if (vectorAC.xLine == 0 || vectorAC.yLine == 0)
+        return isColZeroVector(vectorAC);
+    else
+        return isColVector(vectorAC);
+}
+
+int main(){
+    std::ifstream   inFile("../input.txt");
+    std::ofstream   outFile("../output.txt");
+    int             countObj = 0;
+    s_obj           objTemp;
 
     if(inFile.fail())
         exit(1);
-    inFile >> countObj;
-    if (countObj <= 0)
+    else if (!(inFile >> countObj) || countObj <= 0)
         outFile << "No";
-    else if (countObj == 1 || countObj == 2)
-        outFile << "Yes";
     else {
-        crd = new int*[4];
+        float** crd = new float*[4];
+        bool    status = false;
         for(int i = 0; i < 4; ++i)
-            crd[i] = new int[2];
-        if (findCompareVector(&inFile, crd, &countObj) == 2 || countObj == 0)
-            status = 1;
-        for(;countObj != 0; countObj--) {
+            crd[i] = new float[2];
+        initObjectA(&countObj,crd, &inFile);
+        initCompareVector(&countObj, crd, &inFile, &status);
+        if(countObj == 0)
+            status = true;
+        for(int type;countObj > 0;--countObj){
             if(!(inFile >> type))
                 break;
-            if (type == 1){
-                inFile >> (crd)[0][0];
-                inFile >> (crd)[0][1];
-                inFile >> (crd)[1][0];
-                inFile >> (crd)[1][1];
-                inFile >> (crd)[2][0];
-                inFile >> (crd)[2][1];
-                inFile >> (crd)[3][0];
-                inFile >> (crd)[3][1];
-            }
-            else if (type == 0){
-                inFile >> (crd)[1][0];
-                inFile >> (crd)[0][0];
-                inFile >> (crd)[0][1];
+            else if(type == 1) {
+                for (int i = 0; i < 4; ++i)
+                    for (int j = 0; j < 2; ++j)
+                        (inFile) >> crd[i][j];
+                int posMin = findPositionMinCord(crd);
+                objTemp = {type, crd[posMin][0] + (crd[(posMin + 2)%4][0] - crd[posMin][0]),
+                           crd[posMin][1] + (crd[(posMin + 2)%4][0] - crd[posMin][0])};
             }
             else {
-                outFile << "No";
-                status = 0;
-                break;
+                (inFile) >> crd[1][0];
+                (inFile) >> crd[0][0];
+                (inFile) >> crd[0][1];
+                objTemp = {type, crd[0][0], crd[0][1]};
             }
-            status = algCol((crd), type);
-            if (status == 1)
+            if (!(status = algCollinearity(objTemp)))
+                break;
+            else
                 continue;
-            else {
-                outFile << "No";
-                break;
-            }
         }
-        if(status == 1)
+        if(status)
             outFile << "Yes";
-        for(int i = 0; i < 4; ++i)
-            delete crd[i];
-        delete crd;
+        else
+            outFile << "No";
     }
     inFile.close();
     outFile.close();
-    return (0);
 }
